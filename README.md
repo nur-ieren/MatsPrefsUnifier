@@ -1,5 +1,5 @@
 ## Name
-コピー元とコピー先のliltoon系Materialの設定を統合することから、  
+コピー元とコピー先のliltoon系マテリアルの設定を統合することから、  
 "MatsPrefsUnifier"  
 としました。
 
