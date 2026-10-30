@@ -15,6 +15,7 @@
 //
 // 使い方:
 //   Unityメニュー > nur_ieren > MatsPrefsUnifier
+//   ウィンドウ上部の「日本語 / English」で表示言語を切り替えられます（選択は EditorPrefs に保存されます）。
 //
 // [高速化版]
 //  - シェーダーのプロパティ一覧・値をテンプレートから "1回だけ" 読み取ってキャッシュ
@@ -55,6 +56,10 @@ namespace nur_ieren
         private bool copyKeywords = true;
         private bool verboseLog = true; // false にすると大量処理時にログ生成コストを削減できる
 
+        // --- 表示言語 / Display language ---
+        private const string LangPrefKey = "nur_ieren.MatsPrefsUnifier.English";
+        private bool isEnglish;
+
         private Vector2 scroll;
         private readonly StringBuilder logBuilder = new StringBuilder();
 
@@ -83,48 +88,79 @@ namespace nur_ieren
             window.minSize = new Vector2(440, 420);
         }
 
+        private void OnEnable()
+        {
+            isEnglish = EditorPrefs.GetBool(LangPrefKey, false);
+        }
+
+        // 表示言語に応じた文字列を返す / Returns the string for the current display language
+        private string T(string ja, string en)
+        {
+            return isEnglish ? en : ja;
+        }
+
+        // ウィンドウ上部の言語切り替え (日本語 / English)
+        private void DrawLanguageToggle()
+        {
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.FlexibleSpace();
+            int selected = GUILayout.Toolbar(isEnglish ? 1 : 0, new[] { "日本語", "English" }, GUILayout.Width(160));
+            EditorGUILayout.EndHorizontal();
+
+            bool newIsEnglish = selected == 1;
+            if (newIsEnglish != isEnglish)
+            {
+                isEnglish = newIsEnglish;
+                EditorPrefs.SetBool(LangPrefKey, isEnglish);
+            }
+
+            EditorGUILayout.Space();
+        }
+
         private void OnGUI()
         {
-            EditorGUILayout.LabelField("対象の指定方法", EditorStyles.boldLabel);
+            DrawLanguageToggle();
+
+            EditorGUILayout.LabelField(T("対象の指定方法", "Target Selection Mode"), EditorStyles.boldLabel);
             targetMode = (TargetMode)GUILayout.Toolbar(
                 (int)targetMode,
-                new[] { "フォルダ指定", "GameObject指定" });
+                new[] { T("フォルダ指定", "Folder"), T("GameObject指定", "GameObject") });
 
             EditorGUILayout.Space();
 
             if (targetMode == TargetMode.Folder)
             {
                 targetFolder = (DefaultAsset)EditorGUILayout.ObjectField(
-                    new GUIContent("対象フォルダ", "この中に含まれる lilToon マテリアルが対象になります"),
+                    new GUIContent(T("対象フォルダ", "Target Folder"), T("この中に含まれる lilToon マテリアルが対象になります", "lilToon-family materials inside this folder are processed")),
                     targetFolder, typeof(DefaultAsset), false);
 
-                includeSubfolders = EditorGUILayout.Toggle("サブフォルダも含める", includeSubfolders);
+                includeSubfolders = EditorGUILayout.Toggle(T("サブフォルダも含める", "Include subfolders"), includeSubfolders);
             }
             else
             {
                 targetGameObject = (GameObject)EditorGUILayout.ObjectField(
-                    new GUIContent("対象GameObject", "このオブジェクトと配下の MeshRenderer / SkinnedMeshRenderer が持つ lilToon マテリアルが対象になります"),
+                    new GUIContent(T("対象GameObject", "Target GameObject"), T("このオブジェクトと配下の MeshRenderer / SkinnedMeshRenderer が持つ lilToon マテリアルが対象になります", "lilToon-family materials on the MeshRenderers / SkinnedMeshRenderers of this object and its children are processed")),
                     targetGameObject, typeof(GameObject), true);
 
                 includeInactiveRenderers = EditorGUILayout.Toggle(
-                    new GUIContent("非アクティブなオブジェクトも含める", "OFFにすると非アクティブな子オブジェクトのレンダラーは検索対象から除外します"),
+                    new GUIContent(T("非アクティブなオブジェクトも含める", "Include inactive objects"), T("OFFにすると非アクティブな子オブジェクトのレンダラーは検索対象から除外します", "When OFF, renderers on inactive child objects are excluded from the search")),
                     includeInactiveRenderers);
             }
 
             EditorGUILayout.Space();
 
             templateMaterial = (Material)EditorGUILayout.ObjectField(
-                new GUIContent("テンプレートマテリアル", "ここに設定されている値を他のマテリアルへコピーします"),
+                new GUIContent(T("テンプレートマテリアル", "Template Material"), T("ここに設定されている値を他のマテリアルへコピーします", "Values set on this material are copied to the target materials")),
                 templateMaterial, typeof(Material), false);
 
             EditorGUILayout.Space();
-            EditorGUILayout.LabelField("コピーする項目", EditorStyles.boldLabel);
-            copyShadow = EditorGUILayout.Toggle("影 (Shadow) 設定", copyShadow);
-            copyRim = EditorGUILayout.Toggle("リムシェード (Rim) 設定", copyRim);
-            copyDistanceFade = EditorGUILayout.Toggle("距離フェード (Distance Fade) 設定", copyDistanceFade);
-            copyKeywords = EditorGUILayout.Toggle("関連するON/OFFキーワードも同期する", copyKeywords);
+            EditorGUILayout.LabelField(T("コピーする項目", "Properties to Copy"), EditorStyles.boldLabel);
+            copyShadow = EditorGUILayout.Toggle(T("影 (Shadow) 設定", "Shadow settings"), copyShadow);
+            copyRim = EditorGUILayout.Toggle(T("リムシェード (Rim) 設定", "Rim Shade settings"), copyRim);
+            copyDistanceFade = EditorGUILayout.Toggle(T("距離フェード (Distance Fade) 設定", "Distance Fade settings"), copyDistanceFade);
+            copyKeywords = EditorGUILayout.Toggle(T("関連するON/OFFキーワードも同期する", "Also sync related ON/OFF keywords"), copyKeywords);
             verboseLog = EditorGUILayout.Toggle(
-                new GUIContent("詳細ログを出力する", "大量マテリアル処理時はOFFにすると高速化します"),
+                new GUIContent(T("詳細ログを出力する", "Verbose log"), T("大量マテリアル処理時はOFFにすると高速化します", "Turn OFF to speed up processing of many materials")),
                 verboseLog);
 
             EditorGUILayout.Space();
@@ -136,20 +172,22 @@ namespace nur_ieren
 
             using (new EditorGUI.DisabledScope(!canRun))
             {
-                if (GUILayout.Button("プレビュー（対象マテリアルを確認）", GUILayout.Height(28)))
+                if (GUILayout.Button(T("プレビュー（対象マテリアルを確認）", "Preview (check target materials)"), GUILayout.Height(28)))
                 {
                     Preview();
                 }
 
                 var prevColor = GUI.backgroundColor;
                 GUI.backgroundColor = new Color(1f, 0.6f, 0.6f);
-                if (GUILayout.Button("一括上書きを実行", GUILayout.Height(32)))
+                if (GUILayout.Button(T("一括上書きを実行", "Run Batch Overwrite"), GUILayout.Height(32)))
                 {
                     if (EditorUtility.DisplayDialog(
-                        "確認",
-                        "対象の lilToon マテリアルの影・リム・距離フェード設定を上書きします。\n" +
-                        "Ctrl+Z (Undo) で戻せますが、念のためプロジェクトのバックアップを推奨します。\n\n実行しますか？",
-                        "実行する", "キャンセル"))
+                        T("確認", "Confirm"),
+                        T("対象の lilToon マテリアルの影・リム・距離フェード設定を上書きします。\n" +
+                          "Ctrl+Z (Undo) で戻せますが、念のためプロジェクトのバックアップを推奨します。\n\n実行しますか？",
+                          "This will overwrite the shadow / rim / distance fade settings of the target lilToon-family materials.\n" +
+                          "You can undo with Ctrl+Z, but backing up your project first is recommended.\n\nProceed?"),
+                        T("実行する", "Run"), T("キャンセル", "Cancel")))
                     {
                         Execute();
                     }
@@ -159,11 +197,11 @@ namespace nur_ieren
 
             if (!canRun)
             {
-                EditorGUILayout.HelpBox("対象（フォルダ または GameObject）・テンプレートマテリアルを指定し、コピー項目を1つ以上選んでください。", MessageType.Info);
+                EditorGUILayout.HelpBox(T("対象（フォルダ または GameObject）・テンプレートマテリアルを指定し、コピー項目を1つ以上選んでください。", "Specify a target (folder or GameObject) and a template material, and select at least one property category to copy."), MessageType.Info);
             }
 
             EditorGUILayout.Space();
-            EditorGUILayout.LabelField("ログ", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField(T("ログ", "Log"), EditorStyles.boldLabel);
             scroll = EditorGUILayout.BeginScrollView(scroll, GUILayout.Height(180));
             // 1行ずつLabelFieldを積むとログが数百〜数千行になった際にOnGUIの描画コストが跳ね上がるため、
             // 1つのTextAreaにまとめて描画コストを一定に保つ
@@ -256,8 +294,11 @@ namespace nur_ieren
                     if (!EditorUtility.IsPersistent(mat))
                     {
                         // アセット化されていない（保存できない）マテリアルインスタンスは対象から除外
-                        Debug.LogWarning($"[lilToon一括設定] '{renderer.gameObject.name}' の '{mat.name}' は" +
-                            " アセットとして保存されていないマテリアルのため対象から除外しました。");
+                        Debug.LogWarning(T(
+                            $"[lilToon一括設定] '{renderer.gameObject.name}' の '{mat.name}' は" +
+                            " アセットとして保存されていないマテリアルのため対象から除外しました。",
+                            $"[MatsPrefsUnifier] '{mat.name}' on '{renderer.gameObject.name}' was excluded" +
+                            " because it is not saved as an asset (a material instance)."));
                         continue;
                     }
 
@@ -271,7 +312,7 @@ namespace nur_ieren
         {
             logBuilder.Clear();
             var mats = FindTargetMaterials();
-            logBuilder.AppendLine($"lilToon 系（Uzumore 含む）マテリアルが {mats.Count} 件見つかりました。");
+            logBuilder.AppendLine(T($"lilToon 系（Uzumore 含む）マテリアルが {mats.Count} 件見つかりました。", $"Found {mats.Count} lilToon-family material(s) (including Uzumore)."));
             foreach (var m in mats)
             {
                 logBuilder.AppendLine(" - " + AssetDatabase.GetAssetPath(m));
@@ -280,11 +321,11 @@ namespace nur_ieren
             {
                 if (targetMode == TargetMode.Folder)
                 {
-                    logBuilder.AppendLine("対象フォルダ、または各マテリアルの Shader 設定を確認してください（lilToon 系である必要があります）。");
+                    logBuilder.AppendLine(T("対象フォルダ、または各マテリアルの Shader 設定を確認してください（lilToon 系である必要があります）。", "Check the target folder and each material's shader (it must be a lilToon-family shader)."));
                 }
                 else
                 {
-                    logBuilder.AppendLine("対象GameObject配下に MeshRenderer / SkinnedMeshRenderer が無いか、lilToon マテリアルが割り当てられていない可能性があります。");
+                    logBuilder.AppendLine(T("対象GameObject配下に MeshRenderer / SkinnedMeshRenderer が無いか、lilToon マテリアルが割り当てられていない可能性があります。", "There may be no MeshRenderer / SkinnedMeshRenderer under the target GameObject, or no lilToon material is assigned."));
                 }
             }
         }
@@ -295,14 +336,14 @@ namespace nur_ieren
 
             if (!IsLilToonFamilyMaterial(templateMaterial))
             {
-                logBuilder.AppendLine("エラー：テンプレートマテリアルの Shader が lilToon 系（lilToon / Uzumore Shader など）ではありません。");
+                logBuilder.AppendLine(T("エラー：テンプレートマテリアルの Shader が lilToon 系（lilToon / Uzumore Shader など）ではありません。", "Error: the template material's shader is not a lilToon-family shader (lilToon / Uzumore Shader, etc.)."));
                 return;
             }
 
             var mats = FindTargetMaterials();
             if (mats.Count == 0)
             {
-                logBuilder.AppendLine("対象マテリアルが見つかりませんでした。");
+                logBuilder.AppendLine(T("対象マテリアルが見つかりませんでした。", "No target materials were found."));
                 return;
             }
 
@@ -332,8 +373,8 @@ namespace nur_ieren
                     if (i % 10 == 0 || i == total - 1)
                     {
                         if (EditorUtility.DisplayCancelableProgressBar(
-                            "lilToon 一括処理中...",
-                            $"{i + 1} / {total} 件処理中",
+                            T("lilToon 一括処理中...", "Processing lilToon materials..."),
+                            T($"{i + 1} / {total} 件処理中", $"Processing {i + 1} / {total}"),
                             (float)i / total))
                         {
                             canceled = true;
@@ -358,7 +399,10 @@ namespace nur_ieren
 
                     if (verboseLog)
                     {
-                        logBuilder.AppendLine($"OK ({copiedProps}項目更新): {AssetDatabase.GetAssetPath(mat)}");
+                        string matPath = AssetDatabase.GetAssetPath(mat);
+                        logBuilder.AppendLine(isEnglish
+                            ? $"OK ({copiedProps} properties updated): {matPath}"
+                            : $"OK ({copiedProps}項目更新): {matPath}");
                     }
                 }
             }
@@ -374,11 +418,11 @@ namespace nur_ieren
             logBuilder.AppendLine("----------------------------");
             if (canceled)
             {
-                logBuilder.AppendLine($"キャンセルされました。途中まで {successCount} 件を更新済みです。");
+                logBuilder.AppendLine(T($"キャンセルされました。途中まで {successCount} 件を更新済みです。", $"Canceled. {successCount} material(s) were updated before cancellation."));
             }
             else
             {
-                logBuilder.AppendLine($"完了：{successCount} 件のマテリアルを更新しました。（テンプレート自身をスキップ：{skipCount}件）");
+                logBuilder.AppendLine(T($"完了：{successCount} 件のマテリアルを更新しました。（テンプレート自身をスキップ：{skipCount}件）", $"Done: updated {successCount} material(s). (Template itself skipped: {skipCount})"));
             }
         }
 
