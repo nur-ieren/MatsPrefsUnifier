@@ -63,7 +63,8 @@ This project was created to make repetitive material adjustments more efficient 
 
 ## Author
 
-vor_ges
+- nur_ieren
+- vor_ges
 
 ## Licence
 
