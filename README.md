@@ -63,9 +63,7 @@ This project was created to make repetitive material adjustments more efficient 
 
 ## Author
 
-nur_ieren
-
-[X](https://x.com/nur_ieren)
+vor_ges
 
 ## Licence
 
