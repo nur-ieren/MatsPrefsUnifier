@@ -12,6 +12,8 @@
 //   ・フォルダ指定    : 指定フォルダ（サブフォルダ含む）内の lilToon マテリアルすべてが対象
 //   ・GameObject指定  : 指定GameObjectと配下の MeshRenderer / SkinnedMeshRenderer が
 //                       参照している lilToon マテリアルが対象
+//                       ただし "EditorOnly" タグが付いたオブジェクト（およびその配下）の
+//                       レンダラーは対象外（上書きしない）
 //
 // 使い方:
 //   Unityメニュー > nur_ieren > MatsPrefsUnifier
@@ -59,6 +61,9 @@ namespace nur_ieren
         // --- 表示言語 / Display language ---
         private const string LangPrefKey = "nur_ieren.MatsPrefsUnifier.English";
         private bool isEnglish;
+
+        // GameObject指定モードで「EditorOnly 配下」として除外したレンダラー数（ログ表示用）
+        private int skippedEditorOnlyRenderers;
 
         private Vector2 scroll;
         private readonly StringBuilder logBuilder = new StringBuilder();
@@ -210,6 +215,21 @@ namespace nur_ieren
         }
 
         /// <summary>
+        /// 自分自身または祖先のいずれかに "EditorOnly" タグが付いているかを判定する。
+        /// （ビルド時に EditorOnly オブジェクトは子ごと取り除かれるため、親方向をルートまでたどる）
+        /// 同じ親を共有するレンダラーが多いため、Transform ごとに結果をキャッシュして再走査を避ける。
+        /// </summary>
+        private static bool IsUnderEditorOnly(Transform t, Dictionary<Transform, bool> cache)
+        {
+            if (t == null) return false;
+            if (cache.TryGetValue(t, out bool cached)) return cached;
+
+            bool result = t.gameObject.CompareTag("EditorOnly") || IsUnderEditorOnly(t.parent, cache);
+            cache[t] = result;
+            return result;
+        }
+
+        /// <summary>
         /// lilToon 本体に加えて、lilToon のカスタムシェーダー機構で作られた派生シェーダー
         /// (Uzumore Shader など) も同じ扱いにするための判定。
         /// </summary>
@@ -231,6 +251,8 @@ namespace nur_ieren
 
         private List<Material> FindTargetMaterials()
         {
+            skippedEditorOnlyRenderers = 0;
+
             return targetMode == TargetMode.Folder
                 ? FindTargetMaterialsFromFolder()
                 : FindTargetMaterialsFromGameObject();
@@ -276,12 +298,22 @@ namespace nur_ieren
             if (targetGameObject == null) return result;
 
             var seen = new HashSet<Material>();
+            var editorOnlyCache = new Dictionary<Transform, bool>();
             var renderers = targetGameObject.GetComponentsInChildren<Renderer>(includeInactiveRenderers);
 
             foreach (var renderer in renderers)
             {
                 // MeshRenderer/SkinnedMeshRenderer以外（ParticleSystemRendererなど）は対象外
                 if (!(renderer is MeshRenderer || renderer is SkinnedMeshRenderer)) continue;
+
+                // EditorOnly タグが付いたオブジェクト（およびその配下）のレンダラーは対象外。
+                // レンダラーごと丸ごとスキップするので、同じマテリアルを通常のレンダラーも使っている場合は
+                // そちらのレンダラー経由でちゃんと対象に残る。
+                if (IsUnderEditorOnly(renderer.transform, editorOnlyCache))
+                {
+                    skippedEditorOnlyRenderers++;
+                    continue;
+                }
 
                 var sharedMats = renderer.sharedMaterials;
                 foreach (var mat in sharedMats)
@@ -308,11 +340,22 @@ namespace nur_ieren
             return result;
         }
 
+        // GameObject指定モードで EditorOnly 配下のレンダラーを除外した場合、その件数をログに残す
+        private void AppendEditorOnlyNote()
+        {
+            if (skippedEditorOnlyRenderers <= 0) return;
+
+            logBuilder.AppendLine(T(
+                $"EditorOnly 配下のレンダラー {skippedEditorOnlyRenderers} 件を対象外にしました。",
+                $"Excluded {skippedEditorOnlyRenderers} renderer(s) under EditorOnly objects."));
+        }
+
         private void Preview()
         {
             logBuilder.Clear();
             var mats = FindTargetMaterials();
             logBuilder.AppendLine(T($"lilToon 系（Uzumore 含む）マテリアルが {mats.Count} 件見つかりました。", $"Found {mats.Count} lilToon-family material(s) (including Uzumore)."));
+            AppendEditorOnlyNote();
             foreach (var m in mats)
             {
                 logBuilder.AppendLine(" - " + AssetDatabase.GetAssetPath(m));
@@ -341,6 +384,7 @@ namespace nur_ieren
             }
 
             var mats = FindTargetMaterials();
+            AppendEditorOnlyNote();
             if (mats.Count == 0)
             {
                 logBuilder.AppendLine(T("対象マテリアルが見つかりませんでした。", "No target materials were found."));
