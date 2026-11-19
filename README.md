@@ -1,5 +1,7 @@
 # MatsPrefsUnifier
 
+[日本語](README.ja.md)
+
 A Unity Editor tool for batch-copying selected lilToon material settings.
 
 ## Concept
