@@ -59,10 +59,6 @@ This tool lets you select a template material and copy the settings you need to 
 - Canceling an operation stops further processing, but materials already updated remain changed.
 - Back up your project before running a large batch operation.
 
-## Development
-
-This project was created to make repetitive material adjustments more efficient and consistent across avatar projects.
-
 ## Author
 
 - nur_ieren
